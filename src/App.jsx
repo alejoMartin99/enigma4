@@ -5,34 +5,34 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 class Rotor {
   constructor(wiring, notch) {
-    this.wiring = wiring;
-    this.position = 0;
-    this.notch = notch;
+    this.wiring = wiring; //cableado interno
+    this.position = 0; //posicion actual
+    this.notch = notch; //posicion siguiente a girar
   }
-  setPosition(p) { this.position = p; }
-  forward(c) {
-    const index = (alphabet.indexOf(c) + this.position) % 26;
-    return this.wiring[index];
+  setPosition(p) { this.position = p; } //setea la posición actual del rotor.
+  forward(c) { //encripta
+    const index = (alphabet.indexOf(c) + this.position) % 26; //indice es la posicion de mi caracter del texto + la posicion actual, y le calculo el 26% para mantener la posicion entre 0 y 25
+    return this.wiring[index]; //devuelvo la letra segun el indice del cableado interno
   }
   backward(c) {
-    const index = this.wiring.indexOf(c);
-    return alphabet[(index - this.position + 26) % 26];
+    const index = this.wiring.indexOf(c);//guardo la posición de la letra del cableado interno
+    return alphabet[(index - this.position + 26) % 26]; //duelvo un caracter del alfabeto, y aseguro que devuelva una letra en el rango de 0-25 con % 26 
   }
   rotate() {
     this.position = (this.position + 1) % 26;
-    return this.position === this.notch;
+    return this.position === this.notch;               /*roto una posicion siguiente al rotor y verifico que roto*/ 
   }
 }
 
 class Reflector {
   constructor(wiring) { this.wiring = wiring; }
-  reflect(c) { return this.wiring[alphabet.indexOf(c)]; }
+  reflect(c) { return this.wiring[alphabet.indexOf(c)]; } //revota el cifrado
 }
 
 class Plugboard {
   constructor(pairs=[]) {
     this.map = {};
-    pairs.forEach(([a,b])=>{ this.map[a]=b; this.map[b]=a; });
+    pairs.forEach(([a,b])=>{ this.map[a]=b; this.map[b]=a; }); /*devuelve pares de letras, si recibe A devuelve B por ejemplo*/
   }
   swap(c) { return this.map[c] || c; }
 }
@@ -44,12 +44,12 @@ const ROTORS = {
   IV: ["ESOVPZJAYQUIRHXLNFTGKDCMWB", 9],
   V: ["VZBRGITYUPSDNHLXAWMJQOFECK", 25],
   BETA: ["LEYJVCNIXWPBQMDRTAKZGFUHOS", -1],
-  GAMMA: ["FSOKANUERHMBTIYCWLQPZXVGJD", -1] // 👈 agregado
+  GAMMA: ["FSOKANUERHMBTIYCWLQPZXVGJD", -1] 
 };
 
 const REFLECTORS = {
   "UKW B thin": "ENKQAUYWJICOPBLMDXZVFTHRGS",
-  "UKW C thin": "RDOBJNTKVEHMLFCWZAXGYIPSUQ" // 👈 agregado
+  "UKW C thin": "RDOBJNTKVEHMLFCWZAXGYIPSUQ"
 };
 
 function buildMachine(cfg) {
@@ -69,30 +69,31 @@ function buildMachine(cfg) {
   return { r1, r2, r3, r4, reflector, plugboard };
 }
 
-function encryptWith(machine, text) {
-  const { r1, r2, r3, r4, reflector, plugboard } = machine;
-  let out = "";
+function encryptWith(machine, text) { /*Funcion con toda la logica*/
+  const { r1, r2, r3, r4, reflector, plugboard } = machine; //componentes de enigma M4
+  let out = ""; //salida del texto cifrado
 
-  for (let c of text) {
-    if (!alphabet.includes(c)) continue;
+  for (let c of text) { //recorre caracter por caracter el texto que se ingresa.
 
-    c = plugboard.swap(c);
-    c = r4.forward(c);
-    c = r3.forward(c);
-    c = r2.forward(c);
-    c = r1.forward(c);
+    if (!alphabet.includes(c)) continue; //si la letra era un simbolo, no lo cifro.
 
-    c = reflector.reflect(c);
+    c = plugboard.swap(c); //encripto el caracter en el plugboard
+    c = r4.forward(c); /*encripto el caracter en lo rotores*/
+    c = r3.forward(c); 
+    c = r2.forward(c); 
+    c = r1.forward(c); 
+
+    c = reflector.reflect(c); /*hace que vuelvan a encriptar los rotores*/ 
 
     c = r1.backward(c);
-    c = r2.backward(c);
+    c = r2.backward(c); /*encripto de forma inversa*/
     c = r3.backward(c);
     c = r4.backward(c);
     c = plugboard.swap(c);
 
-    if (r1.rotate()) if (r2.rotate()) if (r3.rotate()) r4.rotate();
+    if (r1.rotate()) if (r2.rotate()) if (r3.rotate()) r4.rotate(); //rotan los rotores en cada cifrado de caracteres
 
-    out += c;
+    out += c; //out es la palabra cifrada/descifrada que devuelve
   }
   return out;
 }
@@ -114,7 +115,8 @@ export default function App(){
   const [mode, setMode] = useState("normal");
   const [data, setData] = useState([]);
   const [box, setBox] = useState(null);
-
+  const [action, setAction] = useState("cifrar");
+  
   const [cfg, setCfg] = useState({
     ref: "UKW B thin",
     r1: "I", r2: "II", r3: "III", r4: "BETA",
@@ -122,7 +124,7 @@ export default function App(){
     plug: [["A","B"],["C","D"]]
   });
 
-  // 🔥 lógica automática rotor 4 → reflector
+ 
   useEffect(() => {
     if (cfg.r4 === "BETA") {
       setCfg(prev => ({ ...prev, ref: "UKW B thin" }));
@@ -133,6 +135,21 @@ export default function App(){
   }, [cfg.r4]);
 
   const handleEncrypt = () => {
+    if (input.length > 250) {
+    alert("Máximo 250 caracteres"); //limite de caracteres
+    return;
+  }
+    setAction("cifrar");
+    const m = buildMachine(cfg);
+    setOutput(encryptWith(m, input.toUpperCase()));
+  };
+
+  const handleDecrypt = () => {
+    if (input.length > 250) {
+    alert("Máximo 250 caracteres"); //limite de caracteres
+    return;
+  }
+    setAction("descifrar");
     const m = buildMachine(cfg);
     setOutput(encryptWith(m, input.toUpperCase()));
   };
@@ -213,11 +230,14 @@ export default function App(){
           />
 
           <div style={{marginTop:10, textAlign:"center"}}>
-            <button style={{background:"#4FC3F7",padding:10,cursor:"pointer"}} onClick={handleEncrypt}>Cifrar</button>
-            <button style={{background:"#4FC3F7",padding:10,marginLeft:10,cursor:"pointer"}} onClick={runSimulation}>Simulación</button>
+            <button style={{background:"#4f68f7",padding:10,cursor:"pointer"}} onClick={handleEncrypt}>Cifrar</button>
+            <button style={{background:"#4f68f7",padding:10,marginLeft:10,cursor:"pointer"}} onClick={handleDecrypt}>Descifrar</button>
+            <button style={{background:"#4f68f7",padding:10,marginLeft:10,cursor:"pointer"}} onClick={runSimulation}>Simulación</button>
           </div>
 
-          <p style={{textAlign:"center"}}>Resultado: {output}</p>
+          <p style={{textAlign:"center"}}>
+            {action === "cifrar" ? "Texto cifrado:" : "Texto descifrado:"} {output}
+          </p>
         </>
       )}
 
@@ -228,7 +248,7 @@ export default function App(){
             {/* GRAFICOS */}
             <div>
               <h2>Histograma</h2>
-              <BarChart width={500} height={250} data={data}>
+              <BarChart width={600} height={300} data={data}>
                 <XAxis dataKey="letter"/>
                 <YAxis/>
                 <Tooltip />
